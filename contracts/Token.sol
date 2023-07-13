@@ -1,78 +1,68 @@
-//SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-// Solidity files have to start with this pragma.
-// It will be used by the Solidity compiler to validate its version.
-pragma solidity ^0.8.9;
-
-// We import this library to be able to use console.log
-import "hardhat/console.sol";
-
-
-// This is the main building block for smart contracts.
 contract Token {
-    // Some string type variables to identify the token.
-    string public name = "My Hardhat Token";
-    string public symbol = "MHT";
+    // Token metadata
+    string public name;    // Name of the token
+    string public symbol;  // Symbol of the token
+    uint256 public totalSupply;  // Total supply of the token
 
-    // The fixed amount of tokens stored in an unsigned integer type variable.
-    uint256 public totalSupply = 1000000;
-
-    // An address type variable is used to store ethereum accounts.
+    // Owner of the contract
     address public owner;
 
-    // A mapping is a key/value map. Here we store each account balance.
-    mapping(address => uint256) balances;
+    // Mapping to store token balances of addresses
+    mapping(address => uint256) public balances;
 
-    // The Transfer event helps off-chain aplications understand
-    // what happens within your contract.
-    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+    // Events
+    event Transfer(address indexed from, address indexed to, uint256 value);  // Event emitted on token transfer
+    event Burn(address indexed from, uint256 value);  // Event emitted when tokens are burned
+    event Mint(address indexed to, uint256 value);  // Event emitted when new tokens are minted
 
-    /**
-     * Contract initialization.
-     */
-    constructor() {
-        // The totalSupply is assigned to the transaction sender, which is the
-        // account that is deploying the contract.
-        balances[msg.sender] = totalSupply;
+    // Constructor
+    constructor(string memory _name, string memory _symbol, uint256 _totalSupply) {
+        name = _name;
+        symbol = _symbol;
+        totalSupply = _totalSupply;
         owner = msg.sender;
+        balances[msg.sender] = _totalSupply;  // Assign total supply to contract owner's balance
     }
 
-    /**
-     * A function to transfer tokens.
-     *
-     * The `external` modifier makes a function *only* callable from outside
-     * the contract.
-     */
-    function transfer(address to, uint256 amount) external {
-        // Check if the transaction sender has enough tokens.
-        // If `require`'s first argument evaluates to `false` then the
-        // transaction will revert.
-        require(balances[msg.sender] >= amount, "Not enough tokens");
-
-        // We can print messages and values using console.log, a feature of
-        // Hardhat Network:
-        console.log(
-            "Transferring from %s to %s %s tokens",
-            msg.sender,
-            to,
-            amount
-        );
-
-        // Transfer the amount.
-        balances[msg.sender] -= amount;
-        balances[to] += amount;
-
-        // Notify off-chain applications of the transfer.
-        emit Transfer(msg.sender, to, amount);
+    // Modifier to restrict access to only the contract owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the contract owner can perform this action");
+        _;
     }
 
-    /**
-     * Read only function to retrieve the token balance of a given account.
-     *
-     * The `view` modifier indicates that it doesn't modify the contract's
-     * state, which allows us to call it without executing a transaction.
-     */
-    function balanceOf(address account) external view returns (uint256) {
-        return balances[account];
+    // Transfer tokens from sender's address to the specified address
+    function transfer(address _to, uint256 _value) public {
+        require(_to != address(0), "Invalid address");
+        require(_value <= balances[msg.sender], "Insufficient balance");
+
+        balances[msg.sender] -= _value;  // Deduct tokens from sender's balance
+        balances[_to] += _value;  // Add tokens to the recipient's balance
+
+        emit Transfer(msg.sender, _to, _value);  // Emit transfer event
+    }
+
+    // Burn tokens from the sender's address
+    function burn(uint256 _value) public {
+        require(_value <= balances[msg.sender], "Insufficient balance");
+
+        balances[msg.sender] -= _value;  // Deduct tokens from sender's balance
+        totalSupply -= _value;  // Deduct tokens from total supply
+
+        emit Burn(msg.sender, _value);  // Emit burn event
+        emit Transfer(msg.sender, address(0), _value);  // Emit transfer event to zero address (burned tokens)
+    }
+
+    // Mint new tokens and assign them to the specified address
+    function mint(address _to, uint256 _value) public onlyOwner {
+        require(_to != address(0), "Invalid address");
+
+        balances[_to] += _value;  // Add tokens to the recipient's balance
+        totalSupply += _value;  // Increase total supply
+
+        emit Mint(_to, _value);  // Emit mint event
+        emit Transfer(address(0), _to, _value);  // Emit transfer event from zero address (minted tokens)
     }
 }
